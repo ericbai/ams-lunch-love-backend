@@ -1,0 +1,47 @@
+using http://www.collectionsjs.com/sorted-set
+
+function clusterUsers(userIds, targetSize, overlapThreshold):
+    # USING USER IDS FROM DATABASE
+    usersToAlreadyMet = [:[]] #hash map of a user to a collection of users that this user has already been paired with
+    usersToNumGroups = [:] #list of tuples of user and num groups that user is a part of ORDERED from most number of groups to least number of groups
+
+    equals = function(obj1, obj2) {
+        return obj1.name === obj2.name;
+    };
+    compare = function(obj1, obj2) {
+        let n1 = obj1.numGroups,
+            n2 = obj2.numGroups;
+        //if same numGroups, always rotate right
+        return (n1 > n2) ? 1 : -1;
+    }
+    clusters = []
+    sortedUsersAndNumGroups = new SortedSet(null, equals, compare)
+    usersToNumGroups.forEach((el) => {
+        sortedUsersAndNumGroups.push({ name:el[0], numGroups:el[1] })
+    });
+
+    #start cluster containing the least-connected user
+    nextCluster = [sortedUsersAndNumGroups.shift()];
+    memberToNumOverlaps = new Map()
+    usersToAlreadyMet[nextCluster[0].name].forEach((alreadyMet) => {
+        memberToNumOverlaps.add(alreadyMet)
+    });
+    while (nextCluster) {
+        nodeToBeAdded = sortedUsersAndNumGroups.findValue((node) => {
+            !memberToNumOverlaps.has(node.name)
+        });
+        if (nodeToBeAdded) {
+            usersToAlreadyMet[nodeToBeAdded.name].forEach((alreadyMet) => {
+                if (memberToNumOverlaps.has(alreadyMet)) {
+                    memberToNumOverlaps.set(memberToNumOverlaps.get(alreadyMet) + 1)
+                } else {
+                    memberToNumOverlaps.add(alreadyMet)
+                }
+            });
+        } else {
+
+        }
+    }
+
+    return clusters, usersRemaining
+end
