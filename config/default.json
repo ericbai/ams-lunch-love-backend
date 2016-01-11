@@ -1,0 +1,13 @@
+{
+	"dbUrl": "http://neo4j:ilovelunch@localhost:7474",
+	"bcrypt": {
+		"rounds": 8
+	},
+	"devJwtKey": "cn06Ukwd1CW2d3pfMbiUtULp86Mh5FfSjsaFGXC7vZgvPSeGm8yNdHt1W512xB07RctAK2NQ1l74qgXkqaMhxcOJsjDCd4cG8FhRiybPWFqgyp0x5kXaNhrd21T8gLZPvx8ciRM9bZL3G0DpkSKh3UiwzmB1NaHanSgqVA23TSYcnXwuQ7yL0Sy0Z6oow9GQiaEg6aMp",
+	"default": {
+		"max": 10,
+		"offset": 0,
+		"clusterSize": 3,
+		"overlapTolerance": 1
+	}
+}
