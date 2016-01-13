@@ -74,11 +74,11 @@ module.exports.create = function(data) {
 				dataToBeSaved.clusterSize = utils.isNumber(data.clusterSize) ? utils.toNumber(data.clusterSize) : config.default.clusterSize;
 				dataToBeSaved.overlapTolerance = utils.isNumber(data.overlapTolerance) ? utils.toNumber(data.overlapTolerance) : config.default.overlapTolerance;
 				dataToBeSaved.password = data.password; //password already hashed
-				insertOrMerge(data, resolve, reject);
+				insertOrMerge(dataToBeSaved, resolve, reject);
 			} else {
 				dataToBeSaved.confirmed = utils.isDefined(data.confirmed) ? data.confirmed : false;
 				dataToBeSaved.classYear = data.classYear;
-				insertOrMerge(data, resolve, reject);
+				insertOrMerge(dataToBeSaved, resolve, reject);
 			}
 		} else {
 			reject({
@@ -99,7 +99,7 @@ function insertOrMerge(data, resolve, reject) {
 			});
 		}
 	}, (notFound) => {
-		db.insertNode(dataToBeSaved, 'User', (err, result) => {
+		db.insertNode(data, 'User', (err, result) => {
 			if (err) return reject(err);
 			resolve({
 				user: result
