@@ -14,6 +14,7 @@
     "express": "^4.9.5",
     "jsonwebtoken": "^5.5.4",
     "node-neo4j": "^2.0.3",
+    "node-require-directory": "^1.0.2",
     "node-uuid": "^1.4.7",
     "rsvp": "^3.1.0"
   },
