@@ -10,6 +10,7 @@
     "body-parser": "^1.14.2",
     "collections": "^3.0.0",
     "config": "^1.17.1",
+    "cors": "^2.7.1",
     "express": "^4.9.5",
     "jsonwebtoken": "^5.5.4",
     "node-neo4j": "^2.0.3",

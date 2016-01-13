@@ -7,7 +7,7 @@ module.exports = function(req, res, next) {
 	if (token) {
 		jwt.verify(token, secret, function(err, decoded) {
 			if (err) {
-				res.status(404).json('Unauthorized');
+				res.status(401).json('Unauthorized');
 			} else {
 				// if everything is good, save to request for use in other routes
 				req.decoded = decoded;
@@ -15,6 +15,6 @@ module.exports = function(req, res, next) {
 			}
 		});
 	} else {
-		res.status(404).json('Unauthorized');
+		res.status(401).json('Unauthorized');
 	}
 };

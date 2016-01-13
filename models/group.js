@@ -24,7 +24,7 @@ module.exports.create = function(...emails) {
 					db.cypherQuery(`MATCH c = (u:User)
 						WHERE u.email IN {emails} AND u.deleted = false
 						MERGE (g:Group { uuid: {uuid}, timestamp: {timestamp} })
-						FOREACH (n in nodes(c) | 
+						FOREACH (n in nodes(c) |
 							MERGE (g)-[:CONTAINS]->(n)
 						)
 						RETURN g`, {
@@ -55,7 +55,7 @@ module.exports.create = function(...emails) {
 
 module.exports.createForAll = function(listOfListOfEmails) {
 	return new RSVP.Promise((resolve, reject) => {
-		if (Array.isArray(listOfListOfEmails) && listOfListOfEmails.length > 1) {
+		if (Array.isArray(listOfListOfEmails) && listOfListOfEmails.length > 0) {
 			const numLists = listOfListOfEmails.length;
 			RSVP.all(listOfListOfEmails.map((listOfEmails) => {
 				return new RSVP.Promise((resolve, reject) => {
@@ -91,7 +91,7 @@ module.exports.createForAll = function(listOfListOfEmails) {
 							statement: `MATCH c = (u:User)
 								WHERE u.email IN {emails} AND u.deleted = false
 								MERGE (g:Group { uuid: {uuid}, timestamp: {timestamp} })
-								FOREACH (n in nodes(c) | 
+								FOREACH (n in nodes(c) |
 									MERGE (g)-[:CONTAINS]->(n)
 								)
 								RETURN g`,
@@ -121,7 +121,7 @@ module.exports.createForAll = function(listOfListOfEmails) {
 
 module.exports.findByUUID = function(uuid) {
 	return new RSVP.Promise((resolve, reject) => {
-		db.cypherQuery(`MATCH (g:Group { uuid: {uuid} })-[:CONTAINS]->(u:User) 
+		db.cypherQuery(`MATCH (g:Group { uuid: {uuid} })-[:CONTAINS]->(u:User)
 			RETURN g, collect(u.email)`, {
 			uuid: uuid
 		}, (err, results) => {
@@ -140,11 +140,11 @@ module.exports.findByUUID = function(uuid) {
 };
 
 module.exports.listByUserEmail = function(email, max, offset) {
-	max = utils.isDefined(max) ? max : config.default.max;
-	offset = utils.isDefined(offset) ? offset : config.default.offset;
+	max = utils.isNumber(max) ? utils.toNumber(max) : config.default.max;
+	offset = utils.isNumber(offset) ? utils.toNumber(offset) : config.default.offset;
 	return new RSVP.Promise((resolve, reject) => {
-		db.cypherQuery(`MATCH (m:User { email: {email} })--(g:Group)-[:CONTAINS]->(u:User) 
-			RETURN g, collect(u.email) + m.email 
+		db.cypherQuery(`MATCH (m:User { email: {email} })--(g:Group)-[:CONTAINS]->(u:User)
+			RETURN g, collect(u.email) + m.email
 			ORDER BY g.timestamp DESC SKIP {offset} LIMIT {max}`, {
 			email: email,
 			offset: offset,
@@ -169,8 +169,8 @@ module.exports.listByUserEmail = function(email, max, offset) {
 };
 
 module.exports.listAll = function(max, offset) {
-	max = utils.isDefined(max) ? max : config.default.max;
-	offset = utils.isDefined(offset) ? offset : config.default.offset;
+	max = utils.isNumber(max) ? utils.toNumber(max) : config.default.max;
+	offset = utils.isNumber(offset) ? utils.toNumber(offset) : config.default.offset;
 	return new RSVP.Promise((resolve, reject) => {
 		db.cypherQuery(`MATCH (g:Group)-[:CONTAINS]->(u:User)
 			RETURN g, collect(u.email) ORDER BY g.timestamp DESC SKIP {offset} LIMIT {max}`, {

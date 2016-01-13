@@ -2,6 +2,7 @@
 
 const express = require('express'),
 	Group = require('../models/group'),
+	User = require('../models/user'),
 	db = require('../db'),
 	RSVP = require('rsvp'),
 	config = require('config'),
@@ -10,22 +11,29 @@ const express = require('express'),
 	app = module.exports = express();
 
 app.get('/', auth, (req, res) => {
+	let max = parseInt(req.query.max),
+		offset = parseInt(req.query.offset),
+		promise;
 	if (req.query.candidates) {
-		const clusterSize = req.decoded.clusterSize ? req.decoded.clusterSize : config.default.clusterSize,
-			overlapTolerance = req.decoded.overlapTolerance ? req.decoded.overlapTolerance : config.default.overlapTolerance;
-		clusterUsers(clusterSize, overlapTolerance, ...req.query.candidates).then((success) => {
-			res.status(200).json(success);
+		User.findByEmail(req.decoded.email).then((result) => {
+			const clusterSize = result.user.clusterSize ? result.user.clusterSize : config.default.clusterSize,
+				overlapTolerance = result.user.overlapTolerance ? result.user.overlapTolerance : config.default.overlapTolerance;
+			clusterUsers(clusterSize, overlapTolerance, ...req.query.candidates).then((success) => {
+				res.status(200).json(success);
+			}, (failure) => {
+				res.status(404).json(failure);
+			});
 		}, (failure) => {
 			res.status(404).json(failure);
 		});
 	} else if (req.query.email) {
-		Group.listByUserEmail(req.query.email, req.query.max, req.query.offset).then((success) => {
+		Group.listByUserEmail(req.query.email, max, offset).then((success) => {
 			res.status(200).json(success);
 		}, (failure) => {
 			res.status(404).json(failure);
 		});
 	} else {
-		Group.listAll(req.query.email, req.query.max, req.query.offset).then((success) => {
+		Group.listAll(req.query.email, max, offset).then((success) => {
 			res.status(200).json(success);
 		}, (failure) => {
 			res.status(500).json(failure);

@@ -12,14 +12,21 @@ app.post('/', (req, res) => {
 		jwt.sign(success, secret, {
 			expiresIn: 86400 // seconds, expires in 24 hours
 		}, (token) => {
-			res.status(200).json({
-				'token': token,
-				'user': {
-					name: success.name,
-					email: success.email,
-					pendingAdmin: success.pendingAdmin,
-					confirmed: success.confirmed
-				}
+			User.listClassYears().then((classYears) => {
+				res.status(200).json({
+					token: token,
+					user: {
+						name: success.name,
+						email: success.email,
+						pendingAdmin: success.pendingAdmin,
+						confirmed: success.confirmed,
+						clusterSize: success.clusterSize,
+						overlapTolerance: success.overlapTolerance
+					},
+					classYears: classYears
+				});
+			}, (failure) => {
+				res.status(500).json(failure);
 			});
 		});
 	}, (failure) => {

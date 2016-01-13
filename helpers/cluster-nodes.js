@@ -46,7 +46,7 @@ module.exports = function(clusterSize, overlapTolerance, ...candidateEmails) {
 						//if no more users left to add, keep this cluster
 						if (sortedEmailsAndNumGroups.length === 0 && nextCluster.length > 1) {
 							clusters.push(nextCluster);
-						} else { //else add the users from this cluster back 
+						} else { //else add the users from this cluster back
 							nextCluster.forEach((node) => {
 								alreadyClusteredEmails.remove(node.email);
 							});
@@ -62,9 +62,11 @@ module.exports = function(clusterSize, overlapTolerance, ...candidateEmails) {
 				});
 				resolve({
 					groups: clusters.map((cluster) => {
-						return cluster.map((node) => {
-							return node.email;
-						});
+						return {
+							users: cluster.map((node) => {
+								return node.email;
+							})
+						};
 					}),
 					meta: {
 						overlap: overlapSoFar,

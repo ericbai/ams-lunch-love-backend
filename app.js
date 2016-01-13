@@ -2,7 +2,12 @@
 
 const express = require('express'),
 	app = express(),
-	bodyParser = require('body-parser');
+	bodyParser = require('body-parser'),
+	cors = require('cors');
+
+//enable CORS and pre-flight
+app.use(cors());
+app.options('*', cors()); // must include before other routes
 
 app.use(bodyParser.json());
 app.use(express.static(`${__dirname}/public`));

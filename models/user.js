@@ -17,8 +17,10 @@ const db = require('../db'),
 module.exports.authenticate = function(email, password) {
 	return new RSVP.Promise((resolve, reject) => {
 		if (email && password) {
-			db.cypherQuery('MATCH (u:User { email: {email} }) RETURN u', {
-				email: email
+			db.cypherQuery(`MATCH (u:User)
+				WHERE u.email =~ {email}
+				RETURN u LIMIT 1`, {
+				email: `(?i)${email}`
 			}, (err, result) => {
 				if (err) return reject(err);
 				if (result.data.length === 0) {
@@ -69,29 +71,14 @@ module.exports.create = function(data) {
 			dataToBeSaved.deleted = utils.isDefined(data.deleted) ? data.deleted : false;
 			if (data.password) {
 				dataToBeSaved.pendingAdmin = utils.isDefined(data.pendingAdmin) ? data.pendingAdmin : true;
-				dataToBeSaved.clusterSize = utils.isDefined(data.clusterSize) ? data.clusterSize : config.default.clusterSize;
-				dataToBeSaved.overlapTolerance = utils.isDefined(data.overlapTolerance) ? data.overlapTolerance : config.default.overlapTolerance;
-				dataToBeSaved.password = data.password;
-				// hash password
-				bcrypt.hash(dataToBeSaved.password, config.bcrypt.rounds, (err, hash) => {
-					if (err) return reject(err);
-					dataToBeSaved.password = hash;
-					db.insertNode(dataToBeSaved, 'User', (err, result) => {
-						if (err) return reject(err);
-						resolve({
-							user: result
-						});
-					});
-				});
+				dataToBeSaved.clusterSize = utils.isNumber(data.clusterSize) ? utils.toNumber(data.clusterSize) : config.default.clusterSize;
+				dataToBeSaved.overlapTolerance = utils.isNumber(data.overlapTolerance) ? utils.toNumber(data.overlapTolerance) : config.default.overlapTolerance;
+				dataToBeSaved.password = data.password; //password already hashed
+				insertOrMerge(data, resolve, reject);
 			} else {
 				dataToBeSaved.confirmed = utils.isDefined(data.confirmed) ? data.confirmed : false;
 				dataToBeSaved.classYear = data.classYear;
-				db.insertNode(dataToBeSaved, 'User', (err, result) => {
-					if (err) return reject(err);
-					resolve({
-						user: result
-					});
-				});
+				insertOrMerge(data, resolve, reject);
 			}
 		} else {
 			reject({
@@ -101,11 +88,31 @@ module.exports.create = function(data) {
 	});
 };
 
+function insertOrMerge(data, resolve, reject) {
+	data.deleted = false;
+	findByEmail(data.email).then((found) => {
+		if (found.user.deleted) {
+			update(data.email, data).then(resolve, reject);
+		} else {
+			reject({
+				message: 'User with that email already exists'
+			});
+		}
+	}, (notFound) => {
+		db.insertNode(dataToBeSaved, 'User', (err, result) => {
+			if (err) return reject(err);
+			resolve({
+				user: result
+			});
+		});
+	});
+}
+
 ////////////
 // Update //
 ////////////
 
-module.exports.update = function(email, data) {
+const update = function(email, data) {
 	return new RSVP.Promise((resolve, reject) => {
 		const fieldsToBeSet = []
 		for (let i = 0; i < numFields; i++) {
@@ -116,8 +123,11 @@ module.exports.update = function(email, data) {
 				fieldsToBeSet.push(`SET u.${field} = ${data[field]}`);
 			}
 		}
-		db.cypherQuery(`MATCH (u:User { email: {email} }) ${fieldsToBeSet.join(' ')} RETURN u`, {
-			email: email
+		db.cypherQuery(`MATCH (u:User)
+			WHERE u.email =~ {email}
+			${fieldsToBeSet.join(' ')}
+			RETURN u`, {
+			email: `(?i)${email}`
 		}, (err, results) => {
 			if (err) return reject(err);
 			if (results.data.length === 0) {
@@ -132,6 +142,7 @@ module.exports.update = function(email, data) {
 		});
 	});
 };
+module.exports.update = update;
 
 ////////////
 // Delete //
@@ -158,6 +169,17 @@ module.exports.delete = function(email) {
 // List //
 //////////
 
+module.exports.listClassYears = function() {
+	return new RSVP.Promise((resolve, reject) => {
+		db.cypherQuery(`MATCH (u:User)
+			WHERE EXISTS(u.classYear)
+			RETURN DISTINCT u.classYear`, (err, results) => {
+			if (err) return reject(err);
+			resolve(results.data);
+		});
+	});
+};
+
 module.exports.existsForEmails = function(...emails) {
 	return new RSVP.Promise((resolve, reject) => {
 		db.cypherQuery(`MATCH (u:User)
@@ -177,10 +199,14 @@ module.exports.existsForEmails = function(...emails) {
 	});
 };
 
-module.exports.findByEmail = function(email) {
+const findByEmail = function(email, isDeleted) {
+	const deletedOption = utils.isDefined(isDeleted) ? `AND u.deleted = ${isDeleted}` : '';
 	return new RSVP.Promise((resolve, reject) => {
-		db.cypherQuery(`MATCH (n:User { email: {email}, deleted: false }) RETURN n LIMIT 1`, {
-			email: email
+		db.cypherQuery(`MATCH (u:User)
+			WHERE u.email =~ {email}
+			${deletedOption}
+			RETURN u LIMIT 1`, {
+			email: `(?i)${email}`
 		}, (err, results) => {
 			if (err) return reject(err);
 			if (results.data.length === 0) {
@@ -195,12 +221,13 @@ module.exports.findByEmail = function(email) {
 		});
 	});
 };
+module.exports.findByEmail = findByEmail;
 
 module.exports.listAdmins = function(isPending, max, offset) {
-	max = utils.isDefined(max) ? max : config.default.max;
-	offset = utils.isDefined(offset) ? offset : config.default.offset;
+	max = utils.isNumber(max) ? utils.toNumber(max) : config.default.max;
+	offset = utils.isNumber(offset) ? utils.toNumber(offset) : config.default.offset;
 	return new RSVP.Promise((resolve, reject) => {
-		db.cypherQuery(`MATCH (n:User) 
+		db.cypherQuery(`MATCH (n:User)
 			WHERE n.pendingAdmin = {isPending} AND exists(n.password)
 				AND n.deleted = false
 			RETURN n ORDER BY n.name SKIP {offset} LIMIT {max}`, {
@@ -209,7 +236,7 @@ module.exports.listAdmins = function(isPending, max, offset) {
 			max: max
 		}, (err, results) => {
 			if (err) return reject(err);
-			db.cypherQuery(`MATCH (n:User) 
+			db.cypherQuery(`MATCH (n:User)
 				WHERE n.pendingAdmin = {isPending} AND exists(n.password)
 					AND n.deleted = false
 				RETURN count(n)`, {
@@ -230,10 +257,10 @@ module.exports.listAdmins = function(isPending, max, offset) {
 };
 
 module.exports.listUsers = function(max, offset) {
-	max = utils.isDefined(max) ? max : config.default.max;
-	offset = utils.isDefined(offset) ? offset : config.default.offset;
+	max = utils.isNumber(max) ? utils.toNumber(max) : config.default.max;
+	offset = utils.isNumber(offset) ? utils.toNumber(offset) : config.default.offset;
 	return new RSVP.Promise((resolve, reject) => {
-		db.cypherQuery(`MATCH (n:User) 
+		db.cypherQuery(`MATCH (n:User)
 			WHERE n.confirmed = true AND exists(n.classYear)
 				AND n.deleted = false
 			RETURN n ORDER BY n.name SKIP {offset} LIMIT {max}`, {
@@ -241,7 +268,7 @@ module.exports.listUsers = function(max, offset) {
 			max: max
 		}, (err, results) => {
 			if (err) return reject(err);
-			db.cypherQuery(`MATCH (n:User) 
+			db.cypherQuery(`MATCH (n:User)
 				WHERE n.confirmed = true AND exists(n.classYear)
 					AND n.deleted = false
 				RETURN count(n)`, (err, countRes) => {
@@ -261,11 +288,11 @@ module.exports.listUsers = function(max, offset) {
 
 module.exports.listByClassYear = function(classYear, max, offset) {
 	classYear = utils.isDefined(classYear) ? classYear : '';
-	max = utils.isDefined(max) ? max : config.default.max;
-	offset = utils.isDefined(offset) ? offset : config.default.offset;
+	max = utils.isNumber(max) ? utils.toNumber(max) : config.default.max;
+	offset = utils.isNumber(offset) ? utils.toNumber(offset) : config.default.offset;
 	return new RSVP.Promise((resolve, reject) => {
-		db.cypherQuery(`MATCH (n:User) 
-			WHERE n.classYear={classYear} AND n.confirmed = true 
+		db.cypherQuery(`MATCH (n:User)
+			WHERE n.classYear={classYear} AND n.confirmed = true
 				AND exists(n.classYear) AND n.deleted = false
 			RETURN n ORDER BY n.name SKIP {offset} LIMIT {max}`, {
 			classYear: classYear,
@@ -273,8 +300,8 @@ module.exports.listByClassYear = function(classYear, max, offset) {
 			max: max
 		}, (err, results) => {
 			if (err) return reject(err);
-			db.cypherQuery(`MATCH (n:User) 
-				WHERE n.classYear={classYear} AND n.confirmed = true 
+			db.cypherQuery(`MATCH (n:User)
+				WHERE n.classYear={classYear} AND n.confirmed = true
 					AND exists(n.classYear) AND n.deleted = false
 				RETURN count(n)`, {
 				classYear: classYear
@@ -295,20 +322,22 @@ module.exports.listByClassYear = function(classYear, max, offset) {
 
 module.exports.search = function(searchString, max, offset) {
 	searchString = utils.isDefined(searchString) ? searchString : '';
-	max = utils.isDefined(max) ? max : config.default.max;
-	offset = utils.isDefined(offset) ? offset : config.default.offset;
+	max = utils.isNumber(max) ? utils.toNumber(max) : config.default.max;
+	offset = utils.isNumber(offset) ? utils.toNumber(offset) : config.default.offset;
 	return new RSVP.Promise((resolve, reject) => {
-		db.cypherQuery(`MATCH (n:User) 
-			WHERE (n.name =~ {search} OR n.email =~ {search}) AND n.confirmed = true
-				AND exists(n.classYear) AND n.deleted = false
+		db.cypherQuery(`MATCH (n:User)
+			WHERE (n.name =~ {search} OR n.email =~ {search})
+				AND n.confirmed = true
+				AND exists(n.classYear)
+				AND n.deleted = false
 			RETURN n ORDER BY n.name SKIP {offset} LIMIT {max}`, {
 			search: `(?i).*${searchString}.*`,
 			offset: offset,
 			max: max
 		}, (err, results) => {
 			if (err) return reject(err);
-			db.cypherQuery(`MATCH (n:User) 
-				WHERE (n.name =~ {search} OR n.email =~ {search}) AND n.confirmed = true 
+			db.cypherQuery(`MATCH (n:User)
+				WHERE (n.name =~ {search} OR n.email =~ {search}) AND n.confirmed = true
 					AND exists(n.classYear) AND n.deleted = false
 				RETURN count(n)`, {
 				search: `(?i).*${searchString}.*`
