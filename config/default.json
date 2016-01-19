@@ -9,5 +9,10 @@
 		"offset": 0,
 		"clusterSize": 3,
 		"overlapTolerance": 1
+	},
+	"email": {
+		"templateId": "eeda607d-ebc8-466c-b5fd-a73eb886ef6b",
+		"sender": "amslunchlove@gmail.com",
+		"urlRoot": "http://www.amslunchlove.com/#"
 	}
 }

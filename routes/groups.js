@@ -2,7 +2,7 @@
 
 const express = require('express'),
 	Group = require('../models/group'),
-	User = require('../models/user'),
+	Admin = require('../models/admin'),
 	db = require('../db'),
 	RSVP = require('rsvp'),
 	config = require('config'),
@@ -15,9 +15,9 @@ app.get('/', auth, (req, res) => {
 		offset = parseInt(req.query.offset),
 		promise;
 	if (req.query.candidates) {
-		User.findByEmail(req.decoded.email).then((result) => {
-			const clusterSize = result.user.clusterSize ? result.user.clusterSize : config.default.clusterSize,
-				overlapTolerance = result.user.overlapTolerance ? result.user.overlapTolerance : config.default.overlapTolerance;
+		Admin.findByEmail(req.decoded.email).then((result) => {
+			const clusterSize = result.admin.clusterSize ? result.admin.clusterSize : config.default.clusterSize,
+				overlapTolerance = result.admin.overlapTolerance ? result.admin.overlapTolerance : config.default.overlapTolerance;
 			clusterUsers(clusterSize, overlapTolerance, ...req.query.candidates).then((success) => {
 				res.status(200).json(success);
 			}, (failure) => {

@@ -16,7 +16,8 @@
     "node-neo4j": "^2.0.3",
     "node-require-directory": "^1.0.2",
     "node-uuid": "^1.4.7",
-    "rsvp": "^3.1.0"
+    "rsvp": "^3.1.0",
+    "sendgrid": "^2.0.0"
   },
   "devDependencies": {
     "mocha": "^1.21.4"

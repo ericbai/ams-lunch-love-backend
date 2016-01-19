@@ -5,7 +5,8 @@ const db = require('../db'),
 	bcrypt = require('bcrypt'),
 	RSVP = require('rsvp'),
 	utils = require('../helpers/utilities'),
-	uuid = require('node-uuid');
+	UUID = require('node-uuid'),
+	sendgrid = require('sendgrid')(process.env['SENDGRID_KEY']);
 
 ////////////
 // Create //
@@ -15,20 +16,20 @@ module.exports.create = function(...emails) {
 	return new RSVP.Promise((resolve, reject) => {
 		if (emails.length > 1) {
 			db.cypherQuery(`MATCH (u:User)
-				WHERE u.email IN {emails} AND u.deleted = false
+				WHERE u.email IN {emails}
 				RETURN count(u)`, {
 				emails: emails
 			}, (err, countRes) => {
 				if (err) return reject(err);
 				if (countRes.data[0] === emails.length) {
 					db.cypherQuery(`MATCH c = (u:User)
-						WHERE u.email IN {emails} AND u.deleted = false
+						WHERE u.email IN {emails}
 						MERGE (g:Group { uuid: {uuid}, timestamp: {timestamp} })
 						FOREACH (n in nodes(c) |
 							MERGE (g)-[:CONTAINS]->(n)
 						)
 						RETURN g`, {
-						uuid: uuid.v4(),
+						uuid: UUID.v4(),
 						timestamp: new Date(),
 						emails: emails
 					}, (err, result) => {
@@ -60,7 +61,7 @@ module.exports.createForAll = function(listOfListOfEmails) {
 			RSVP.all(listOfListOfEmails.map((listOfEmails) => {
 				return new RSVP.Promise((resolve, reject) => {
 					db.cypherQuery(`MATCH (u:User)
-						WHERE u.email IN {emails} AND u.deleted = false
+						WHERE u.email IN {emails}
 						RETURN count(u)`, {
 						emails: listOfEmails
 					}, (err, countRes) => {
@@ -69,6 +70,7 @@ module.exports.createForAll = function(listOfListOfEmails) {
 							resolve();
 						} else {
 							reject({
+								status: 404,
 								message: `Some users could not be found for provided emails: ${listOfEmails}`
 							});
 						}
@@ -78,7 +80,7 @@ module.exports.createForAll = function(listOfListOfEmails) {
 				const newGroups = [],
 					statements = listOfListOfEmails.map((listOfEmails) => {
 						const parameters = {
-							uuid: uuid.v4(),
+							uuid: UUID.v4(),
 							timestamp: new Date(),
 							emails: listOfEmails
 						};
@@ -89,7 +91,7 @@ module.exports.createForAll = function(listOfListOfEmails) {
 						});
 						return {
 							statement: `MATCH c = (u:User)
-								WHERE u.email IN {emails} AND u.deleted = false
+								WHERE u.email IN {emails}
 								MERGE (g:Group { uuid: {uuid}, timestamp: {timestamp} })
 								FOREACH (n in nodes(c) |
 									MERGE (g)-[:CONTAINS]->(n)
@@ -102,8 +104,18 @@ module.exports.createForAll = function(listOfListOfEmails) {
 					"statements": statements
 				}, (err, results) => {
 					if (err) return reject(results.errors || err);
-					resolve({
-						groups: newGroups
+					RSVP.all(newGroups.map((group) => {
+						const users = group.users;
+						return sendGroupEmail(...users);
+					})).then(() => {
+						resolve({
+							groups: newGroups
+						});
+					}, () => {
+						reject({
+							status: 500,
+							message: 'Could not send emails to all new groups. Please try again later.'
+						});
 					});
 				});
 			}, reject);
@@ -111,6 +123,43 @@ module.exports.createForAll = function(listOfListOfEmails) {
 			reject({
 				message: 'Must pass at least one group to create.'
 			});
+		}
+	});
+}
+
+function sendGroupEmail(...recipients) {
+	return new RSVP.Promise((resolve, reject) => {
+		if (process.env['SENDGRID_KEY']) {
+			const recipientsList = recipients.map((recipient) => {
+					return `<li style="padding-left:1em; border-left: 15px solid #b74c4c; margin: 0 0 1em 1em;">
+								${recipient}
+							</li>`;
+				}).join(''),
+				email = new sendgrid.Email({
+					to: recipients,
+					from: config.email.sender,
+					subject: "You've been grouped!",
+					html: `The day has finally come! Here are the people you've been grouped with! Reply to this thread to find a time to grab food, hang out, and get to know each other.<br/>
+						<ul style="list-style:none; padding:0;">
+							${recipientsList}
+						</ul>
+						Take the plunge! You're worth it!`
+				});
+			email.setFilters({
+				'templates': {
+					'settings': {
+						'enable': 1,
+						'template_id': config.email.templateId,
+					}
+				}
+			});
+			sendgrid.send(email, function(err, result) {
+				if (err) return reject(err);
+				resolve(result);
+			});
+		} else {
+			console.log("EMAIL SENDING NOT AVAILABLE TO " + recipients);
+			resolve();
 		}
 	});
 }
@@ -123,7 +172,7 @@ module.exports.findByUUID = function(uuid) {
 	return new RSVP.Promise((resolve, reject) => {
 		db.cypherQuery(`MATCH (g:Group { uuid: {uuid} })-[:CONTAINS]->(u:User)
 			RETURN g, collect(u.email)`, {
-			uuid: uuid
+			uuid: UUID
 		}, (err, results) => {
 			if (err) return reject(err);
 			if (results.data.length === 0) {
