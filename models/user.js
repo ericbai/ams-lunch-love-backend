@@ -218,7 +218,7 @@ function sendUserConfirmation(token, ...recipients) {
 				to: recipients,
 				from: config.email.sender,
 				subject: 'Welcome! Confirm your subscription!',
-				html: `Welcome to AMS Lunch Love. To complete the signup process, please <a href="${config.email.urlRoot}/confirm/user?token=${token}" target="_blank">confirm your subscription</a>.<br/><br/>
+				html: `Welcome to AMS Lunch Love. To complete the signup process, please <a href="${config.email.urlRoot}/confirm/user?token=${token}" target="_blank">confirm your subscription</a>. <b>If you do not confirm your account, we won't be able to group you!</b><br/><br/>
 
 				Please save this email as you may <a href="${config.email.urlRoot}/confirm/unsubscribe?token=${token}" target="_blank">click here to unsubscribe at any time</a>.`
 			});
